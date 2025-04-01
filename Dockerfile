@@ -36,7 +36,8 @@ COPY app.py /app/
 
 # 6) Cron job tanımını /etc/cron.d/ içine ekliyoruz
 #    Bu satır her saat başında (dakika 0) çalışacak şekilde ayarlı.
-RUN echo "0 * * * * python /app/app.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
+RUN echo "*/5 * * * * python /app/app.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
+
 
 # 7) Cron dosyasına doğru izinleri verip crontab'e ekliyoruz
 RUN chmod 0644 /etc/cron.d/r10cron
