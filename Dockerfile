@@ -1,9 +1,7 @@
 # 1) Python tabanlı, minimal bir imaj seçiyoruz
 FROM python:3.9-slim
 
-# 2) Gerekli paketleri kuruyoruz (cron, gereken kütüphaneler vb.)
-#    Playwright'in tarayıcıları çalıştırabilmesi için ek kütüphaneler gerekebilir.
-#    İhtiyaca göre eksik varsa ekleyin.
+# 2) Sistem kütüphanelerini ve cron'u kuruyoruz
 RUN apt-get update && apt-get install -y \
     cron \
     libnss3 \
@@ -24,31 +22,39 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# 3) Python paketlerini kuruyoruz
-RUN pip install playwright
+# 3) Playwright ve Flask tabanlı Python paketlerini kuruyoruz
+RUN pip install --no-cache-dir \
+    flask \
+    flask_sqlalchemy \
+    flask_admin \
+    flask_login \
+    playwright
+
+# 4) Playwright’in tarayıcı bağımlılıklarını indiriyoruz
 RUN playwright install chromium
 
-# 4) Uygulama dizinini belirliyoruz
+# 5) Uygulama dizinini belirliyoruz
 WORKDIR /app
 
-# 5) app.py dosyamızı konteynera kopyalıyoruz
-COPY app.py /app/
+# 6) Proje dosyalarını kopyalıyoruz
+COPY app.py tasks.py /app/
+COPY templates /app/templates
 
-# 6) Cron job tanımını /etc/cron.d/ içine ekliyoruz
-#    Bu satır her 5 dakikada bir çalışacak şekilde ayarlı.
-#    Dikkat: '/usr/local/bin/python' yolunu kullandık, çünkü cron bazen 'python' komutunu bulamıyor.
-RUN echo "0 * * * * /usr/local/bin/python /app/app.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
+# 7) Cron job tanımını oluşturuyoruz
+#    Burada her saat başı tasks.py çalışacak şekilde ayarladık
+RUN echo "0 * * * * /usr/local/bin/python /app/tasks.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
 
-# 7) Cron dosyasına doğru izinleri verip crontab'e ekliyoruz
-RUN chmod 0644 /etc/cron.d/r10cron
-RUN crontab /etc/cron.d/r10cron
+# 8) Cron dosyasına gerekli izinleri verip crontab'e ekliyoruz
+RUN chmod 0644 /etc/cron.d/r10cron \
+    && crontab /etc/cron.d/r10cron
 
-# 8) Cron çıktısını tutmak için log dosyası oluşturuyoruz
+# 9) Cron log dosyasını oluşturuyoruz
 RUN touch /var/log/cron.log
 
-# 9) Entrypoint dosyamızı kopyalıyoruz (logları ekrana yönlendirecek script)
+# 10) Entrypoint betiğini kopyalayıp çalıştırılabilir yapıyoruz
+#     (entrypoint.sh içinde cron’u başlatıp ardından Flask sunucusunu ayağa kaldırabilirsiniz)
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# 10) Konteyner başlarken entrypoint.sh'yi çalıştırıyoruz
+# 11) Konteyner ayağa kalktığında entrypoint.sh çalışsın
 CMD ["/entrypoint.sh"]
