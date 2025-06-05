@@ -35,9 +35,9 @@ WORKDIR /app
 COPY app.py /app/
 
 # 6) Cron job tanımını /etc/cron.d/ içine ekliyoruz
-#    Bu satır her saat başında (dakika 0) çalışacak şekilde ayarlı.
-RUN echo "*/5 * * * * python /app/app.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
-
+#    Bu satır her 5 dakikada bir çalışacak şekilde ayarlı.
+#    Dikkat: '/usr/local/bin/python' yolunu kullandık, çünkü cron bazen 'python' komutunu bulamıyor.
+RUN echo "0 * * * * /usr/local/bin/python /app/app.py >> /var/log/cron.log 2>&1" > /etc/cron.d/r10cron
 
 # 7) Cron dosyasına doğru izinleri verip crontab'e ekliyoruz
 RUN chmod 0644 /etc/cron.d/r10cron
@@ -46,5 +46,9 @@ RUN crontab /etc/cron.d/r10cron
 # 8) Cron çıktısını tutmak için log dosyası oluşturuyoruz
 RUN touch /var/log/cron.log
 
-# 9) Konteyner başlarken cron'u foreground (ön planda) şekilde çalıştırıyoruz
-CMD ["cron", "-f"]
+# 9) Entrypoint dosyamızı kopyalıyoruz (logları ekrana yönlendirecek script)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# 10) Konteyner başlarken entrypoint.sh'yi çalıştırıyoruz
+CMD ["/entrypoint.sh"]

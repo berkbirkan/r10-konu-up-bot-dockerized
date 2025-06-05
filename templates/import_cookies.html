@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Import Cookies</title>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+      textarea { font-family: monospace; }
+    </style>
+</head>
+<body class="bg-light">
+  <div class="container mt-4">
+    <h2>Çerezleri JSON Olarak Yapıştır</h2>
+    <p>Tarayıcıdan “Export Cookies” şeklinde aldığınız ham JSON metnini aşağıya yapıştırın. Ardından “İçe Aktar” butonuna basın.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} mt-2">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('cookieimport.index') }}">
+      <div class="form-group">
+        <label for="cookie_json">Cookie JSON Metni</label>
+        <textarea class="form-control" id="cookie_json" name="cookie_json"
+                  rows="15" placeholder='Örnek: [{"domain":".r10.net","expirationDate":1749151760,... }, {...}]'></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">İçe Aktar</button>
+      <a href="{{ url_for('admin.index') }}" class="btn btn-secondary">Geri Dön</a>
+    </form>
+  </div>
+</body>
+</html>

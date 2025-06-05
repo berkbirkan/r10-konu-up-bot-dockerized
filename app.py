@@ -1,385 +1,210 @@
+import os
 import json
-from playwright.sync_api import sync_playwright
-import time
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_admin import Admin, BaseView, expose
+from flask_admin.contrib.sqla import ModelView
+from flask_login import LoginManager, UserMixin, current_user, login_user, logout_user
 
-# Elinizdeki tüm çerezleri (eksiksiz) Python listesi olarak buraya koyuyoruz:
-json_cookies = [
-    {
-        "domain": ".r10.net",
-        "expirationDate": 1743546192,
-        "hostOnly": False,
-        "httpOnly": False,
-        "name": "R10AnalizToken",
-        "path": "/",
-        "sameSite": "unspecified",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": ".r10.net",
-        "expirationDate": 1774345840.730489,
-        "hostOnly": False,
-        "httpOnly": True,
-        "name": "r10deviceid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "dddd9786b9b4770eb1a7932582b0c006"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1775051036.243347,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10_ga_BH2NDKEFAS",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "1.1.43854821.1699371016"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.617784,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10CookiePolicy",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.618706,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10deviceid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.619585,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10fast2otp",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10forum_view",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": True,
-        "value": "33141d41ea547140f5c4f016c6e2af321189dc7ea-1-%7Bi-512_i-1743026446_%7D"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562179.750056,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10imloggedin",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "yes"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.619541,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10languageid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1775051036.243269,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10lastactivity",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "0"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1775051036.243116,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10lastvisit",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "1743515036"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.618913,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10LeftHide",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562179.749848,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10mobile",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "139"
-    },
-    {
-        "domain": "www.r10.net",
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10np_notices_displayed",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": True,
-        "value": "new_pm_as_notice"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562179.749951,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10password",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "5d749c9befc705a2b01c3240a324f159"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562102.412659,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10preload",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "1"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.619408,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10referrerid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10sessionhash",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": True,
-        "value": "6399e2fad054ba3b7f609ffb65d0a54f"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.619495,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10styleid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10thread_lastview",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": True,
-        "value": "b221ffcdd39f9d1794cb4738a2bbca159cdca7fca-73-%7Bi-512_i-1743026446_%7D"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562100.619454,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "r10threadedmode",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": ""
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1774562179.749766,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10userid",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "175725"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1743518636.085273,
-        "hostOnly": True,
-        "httpOnly": True,
-        "name": "r10vb_fg",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "1"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1743546192,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "roanalytics",
-        "path": "/",
-        "sameSite": "unspecified",
-        "secure": False,
-        "session": False,
-        "value": "1"
-    },
-    {
-        "domain": "www.r10.net",
-        "expirationDate": 1743515589.170769,
-        "hostOnly": True,
-        "httpOnly": False,
-        "name": "vbseo_loggedin",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": True,
-        "session": False,
-        "value": "yes"
-    }
-]
+# ------------------------------------------------------------------------------
+# 1) Flask + SQLAlchemy + LoginManager + Admin Konfigürasyonu
+# ------------------------------------------------------------------------------
+app = Flask(__name__)
+basedir = os.path.abspath(os.path.dirname(__file__))
 
-def convert_cookie(editthiscookie_item):
-    """
-    Tek bir EditThisCookie stilindeki çerezi,
-    Playwright'in beklediği formata dönüştürür.
-    """
-    playwright_cookie = {
-        "name": editthiscookie_item["name"],
-        "value": editthiscookie_item["value"],
-        "domain": editthiscookie_item["domain"],
-        "path": editthiscookie_item.get("path", "/"),
-        "httpOnly": editthiscookie_item.get("httpOnly", False),
-        "secure": editthiscookie_item.get("secure", False),
-    }
+# Burada daha önceden kullandığınız veri tabanı bağlantısını aynen bırakın.
+# Örnek: SQLite kullanıyorsanız:
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'config.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'super-secret-key'
 
-    # sameSite dönüştürme
-    same_site = editthiscookie_item.get("sameSite", "")
-    if same_site.lower() in ("no_restriction", "unspecified"):
-        playwright_cookie["sameSite"] = "None"
-    elif same_site.lower() == "lax":
-        playwright_cookie["sameSite"] = "Lax"
-    elif same_site.lower() == "strict":
-        playwright_cookie["sameSite"] = "Strict"
-    else:
-        playwright_cookie["sameSite"] = "None"
+db = SQLAlchemy(app)
 
-    # session mı, kalıcı mı?
-    if editthiscookie_item.get("session"):
-        # Oturum çerezi => "expires" eklemiyoruz
-        pass
-    else:
-        exp = editthiscookie_item.get("expirationDate")
-        if exp:
-            # Bazıları float olabiliyor, int() yapıyoruz
-            playwright_cookie["expires"] = int(exp)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
-    return playwright_cookie
+# ------------------------------------------------------------------------------
+# 2) Modeller: Cookie ve CronSetting (önceden eklediğiniz satırlar)
+# ------------------------------------------------------------------------------
+class Cookie(db.Model):
+    __tablename__ = 'cookie'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    value = db.Column(db.Text, nullable=False)
+    domain = db.Column(db.String(255), nullable=False)
+    path = db.Column(db.String(255), nullable=False, default='/')
+    http_only = db.Column(db.Boolean, nullable=False, default=False)
+    secure = db.Column(db.Boolean, nullable=False, default=False)
+    same_site = db.Column(db.String(20), nullable=False, default='None')  # “None”, “Lax” veya “Strict”
+    expires = db.Column(db.Integer, nullable=True)  # UNIX timestamp olarak saklanabilir
+    session = db.Column(db.Boolean, nullable=False, default=False)
 
+    def __repr__(self):
+        return f'<Cookie {self.name} | {self.domain}>'
 
-def main():
-    from playwright.sync_api import sync_playwright
+class CronSetting(db.Model):
+    __tablename__ = 'cron_setting'
+    id = db.Column(db.Integer, primary_key=True)
+    job_name = db.Column(db.String(255), nullable=False, unique=True)
+    cron_expression = db.Column(db.String(100), nullable=False)  # Örnek: "0 0 * * *"
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
 
-    # Tüm çerezleri dönüştür
-    playwright_cookies = [convert_cookie(c) for c in json_cookies]
+    def __repr__(self):
+        return f'<CronSetting {self.job_name} | {self.cron_expression} | Enabled={self.enabled}>'
 
-    with sync_playwright() as p:
-        # İstediğiniz tarayıcı: chromium, firefox, webkit
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
+# ------------------------------------------------------------------------------
+# 3) Basit Admin Kullanıcısı (örnek) ve SecureModelView
+# ------------------------------------------------------------------------------
+class AdminUser(UserMixin):
+    id = 1
+    username = 'admin'
+    is_admin = True
 
-        # Çerezleri ekle
-        context.add_cookies(playwright_cookies)
+@login_manager.user_loader
+def load_user(user_id):
+    if int(user_id) == 1:
+        return AdminUser()
+    return None
 
-        page = context.new_page()
-        # 2) R10 kontrol paneline gidelim
-        page.goto("https://www.r10.net/kontrol-paneli/")
-        print("Sayfa başlığı:", page.title())
-        print("Sayfa URL:", page.url)
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'password':
+            user = AdminUser()
+            login_user(user)
+            return redirect(request.args.get('next') or url_for('admin.index'))
+        flash('Geçersiz kullanıcı adı veya şifre.', 'danger')
+    return render_template('login.html')
 
-        # "yukarı taşı" linki -> a.robtn.rogreen.r10upevent
-        up_button = page.locator("a.robtn.rogreen.r10upevent")
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
-        count = up_button.count()
-        print("Buton sayısı:", count)
+class SecureModelView(ModelView):
+    def is_accessible(self):
+        try:
+            return current_user.is_authenticated and current_user.is_admin
+        except:
+            return False
 
-        if count > 0:
-            href = up_button.first.get_attribute("href")
-            print("Bulunan href:", href)
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login', next=request.url))
 
-            # JavaScript ile tıklayalım
-            print("JavaScript .click() deniyoruz...")
-            page.evaluate("document.querySelector('a.robtn.rogreen.r10upevent').click()")
-            print("JS ile tıklandı!")
+# ------------------------------------------------------------------------------
+# 4) Admin Panelini Oluştur ve Modelleri Kaydet
+# ------------------------------------------------------------------------------
+admin = Admin(app, name='Control Panel', template_mode='bootstrap3')
+admin.add_view(SecureModelView(Cookie, db.session, category='Ayarlar'))
+admin.add_view(SecureModelView(CronSetting, db.session, category='Ayarlar'))
 
-            time.sleep(10)
-        else:
-            print("buton bulunamadı")
+# ------------------------------------------------------------------------------
+# 5) “Ham JSON Olarak Çerez Yapıştırma” İçin Özel View
+# ------------------------------------------------------------------------------
+class CookieImportView(BaseView):
+    @expose('/', methods=['GET', 'POST'])
+    def index(self):
+        # Giriş kontrolü
+        if not (current_user.is_authenticated and current_user.is_admin):
+            return redirect(url_for('login', next=request.url))
 
-        context.close()
+        if request.method == 'POST':
+            raw_json = request.form.get('cookie_json', '').strip()
+            if not raw_json:
+                flash('Lütfen JSON içeriği yapıştırın.', 'warning')
+                return redirect(url_for('cookieimport.index'))
 
-if __name__ == "__main__":
-    main()
+            try:
+                parsed_list = json.loads(raw_json)
+                if not isinstance(parsed_list, list):
+                    raise ValueError('Yapıştırdığınız içerik bir liste değil.')
+
+                # Mevcut Cookie kayıtlarını tamamen silip yenilerini eklemek isterseniz:
+                # Cookie.query.delete()
+                # db.session.commit()
+
+                for item in parsed_list:
+                    # Zorunlu alanlar kontrolü
+                    name = item.get('name')
+                    value = item.get('value', '')
+                    domain = item.get('domain')
+                    path = item.get('path', '/')
+                    http_only = item.get('httpOnly', False)
+                    secure = item.get('secure', False)
+                    same_site_raw = item.get('sameSite', '')
+                    session_flag = item.get('session', False)
+                    expires_raw = item.get('expirationDate', None)
+
+                    # sameSite dönüştürme: “no_restriction” veya “unspecified” → “None”
+                    same_site = 'None'
+                    if same_site_raw.lower() in ('no_restriction', 'unspecified'):
+                        same_site = 'None'
+                    elif same_site_raw.lower() == 'lax':
+                        same_site = 'Lax'
+                    elif same_site_raw.lower() == 'strict':
+                        same_site = 'Strict'
+
+                    expires = None
+                    if not session_flag and expires_raw is not None:
+                        try:
+                            expires = int(expires_raw)
+                        except:
+                            expires = None
+
+                    # Burada, eğer isim+domain ikilisiyle kayıt varsa güncelle, yoksa yeni ekle:
+                    existing = Cookie.query.filter_by(name=name, domain=domain).first()
+                    if existing:
+                        existing.value = value
+                        existing.path = path
+                        existing.http_only = http_only
+                        existing.secure = secure
+                        existing.same_site = same_site
+                        existing.expires = expires
+                        existing.session = session_flag
+                    else:
+                        new_cookie = Cookie(
+                            name=name,
+                            value=value,
+                            domain=domain,
+                            path=path,
+                            http_only=http_only,
+                            secure=secure,
+                            same_site=same_site,
+                            expires=expires,
+                            session=session_flag
+                        )
+                        db.session.add(new_cookie)
+
+                db.session.commit()
+                flash(f'{len(parsed_list)} adet çerez başarıyla aktarıldı.', 'success')
+                return redirect(url_for('cookieimport.index'))
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Import hatası: {str(e)}', 'danger')
+                return redirect(url_for('cookieimport.index'))
+
+        # GET isteğinde sadece form göster
+        return self.render('import_cookies.html')
+
+    def is_accessible(self):
+        try:
+            return current_user.is_authenticated and current_user.is_admin
+        except:
+            return False
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login', next=request.url))
+
+# Admin paneline bu view'i ekleyelim. endpoint='cookieimport'
+admin.add_view(CookieImportView(name='Import Cookies', endpoint='cookieimport'))
+
+# ------------------------------------------------------------------------------
+# 6) Uygulamayı Çalıştır ve Tablo Oluştur
+# ------------------------------------------------------------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000, debug=True)
